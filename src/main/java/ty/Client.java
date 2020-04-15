@@ -50,7 +50,7 @@ public class Client {
     public static void testOne() {
         ZookeeperLock zl = new ZookeeperLock();
         LockNode nana = zl.getLock(R_NODE, 365 * 24 * 3600 * 1000);
-        System.out.println("获取到nana锁");
+        System.out.println("获取到兔屁锁");
     }
 
     /**
