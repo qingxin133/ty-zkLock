@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit;
 
 public class Client {
 
-//    private static final String rootNode = "/ribbit";
     private static ZookeeperLock zl = new ZookeeperLock();
     private static final String R_NODE = "/ZK_LOCKA";
 
@@ -19,10 +18,13 @@ public class Client {
         Client.doMain();
     }
 
-    public static void doSimple() {
+    /**
+     *
+     */
+    public static void doEpNodeSimple() {
         ZkClient zkClient = null;
         try {
-            String zkServers = "192.168.0.120:2181";
+            String zkServers = "192.168.0.120:2181,192.168.0.120:2182,192.168.0.120:2183";
             int connectionTimeOut = 20000;
             int sessionTimeOut = 30000;
             zkClient = new ZkClient(zkServers, sessionTimeOut, connectionTimeOut);
@@ -42,13 +44,21 @@ public class Client {
         }
     }
 
-
+    /**
+     * 获取锁测试
+     */
     public static void testOne() {
         ZookeeperLock zl = new ZookeeperLock();
-        LockNode nana = zl.lock(R_NODE, 365 * 24 * 3600 * 1000);
+        LockNode nana = zl.getLock(R_NODE, 365 * 24 * 3600 * 1000);
         System.out.println("获取到nana锁");
     }
 
+    /**
+     * 主类测试
+     * 1000个线程抢锁，有序写入文件
+     * @throws InterruptedException
+     * @throws IOException
+     */
     public static void doMain() throws InterruptedException, IOException {
 
         File file = new File("d:/test.txt");
@@ -58,15 +68,18 @@ public class Client {
         ExecutorService es = Executors.newCachedThreadPool();
         for (int i = 0; i < 1000; i++) {
             es.submit(() -> {
-                LockNode lockNode = zl.lock(R_NODE, 60 * 1000);
+                LockNode lockNode = zl.getLock(R_NODE, 60 * 1000); //获取锁，没有获取到就自旋60秒
                 try {
+                    //如果获取到锁，执行业务操作
                     String firstLine = Files.lines(file.toPath()).findFirst().orElse("0");
                     int count = Integer.parseInt(firstLine);
                     count++;
                     Files.write(file.toPath(), String.valueOf(count).getBytes());
+                    System.out.println(Thread.currentThread().getName()+"写入数据：" + count);
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
+                    //执行完本服务的业务，释放锁
                     zl.unLock(lockNode);
                 }
             });

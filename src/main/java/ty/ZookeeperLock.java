@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 public class ZookeeperLock {
 
     //zk地址和端口号
-    private final String zkServers = "192.168.0.120:2181";
+    private final String zkServers = "192.168.0.120:2181,192.168.0.120:2182,192.168.0.120:2183";
     //连接超时时限
     private final int connectionTimeOut = 20000;
     //session超时时限
@@ -34,10 +34,12 @@ public class ZookeeperLock {
      * @param timeout
      * @return
      */
-    public LockNode lock(String lockId, long timeout) {
+    public LockNode getLock(String lockId, long timeout) {
+        //创建临时有序节点，默认未激活
         LockNode lockNode = createLockNode(lockId);
+        //尝试激活当前节点，如果自己是最小的
         lockNode = tryActiveLock(lockNode);
-        if (!lockNode.isActive()) {
+        while (!lockNode.isActive()) {
             try {
                 synchronized (lockNode) {
                     lockNode.wait(timeout); //tryActiveLock
@@ -51,7 +53,9 @@ public class ZookeeperLock {
 
     /**
      * 激活锁
-     *
+     * 如果自己是最小的有序临时节点，就激活自己，如果不是，就监听你前面的节点的删除事件
+     * 得到监听事件，再次查看自己是否最小的节点，是就在同步代码块中，判断自己是否已经激活，是就唤醒自己的节点，取消对前一个节点的监听，
+     * 不是就继续监听你最新的前一个节点
      * @param lockNode
      * @return
      */
@@ -59,6 +63,7 @@ public class ZookeeperLock {
         if (StringUtils.isBlank(lockNode.getLockId()))
             throw new RuntimeException("锁路径不能为空");
         String firstPath = "";
+
         //判断是否获得锁
         List<String> list = zkClient.getChildren(lockNode.getLockId())
                 .stream()
@@ -67,6 +72,7 @@ public class ZookeeperLock {
                 .collect(Collectors.toList());
         if (list != null && list.size()>0)
             firstPath = list.get(0);
+
         //如果自己是第一个，把自己激活
         if (firstPath.equals(lockNode.getPath())) {
             lockNode.setActive(true);
@@ -78,8 +84,10 @@ public class ZookeeperLock {
                 //如果当前线程超时，导至节点被删除，将影响锁的逻辑
                 @Override
                 public void handleDataDeleted(String dataPath) throws Exception {
-                    System.out.println("删除节点：" + dataPath);
-                    //重新激活锁，再获得锁，如果可以获得锁，再释放，如果没有权限继续添加监听，此时的监听会往上移一个
+//                    System.out.println("删除节点：" + dataPath);
+                    //检查自己是否第一个，如果是再次激活自己
+                    //在线程同步的状态下，把自己的锁释放，然后取消舰艇
+                    //重新激活锁，再获得锁，如果可以获得锁，再释放，如果没有权限，继续添加监听，此时的监听会往上移一个
                     LockNode lock = tryActiveLock(lockNode);
                     synchronized (lockNode) {
                         if (lock.isActive()) {
