@@ -56,6 +56,7 @@ public class Client {
     /**
      * 主类测试
      * 1000个线程抢锁，有序写入文件
+     *
      * @throws InterruptedException
      * @throws IOException
      */
@@ -75,7 +76,7 @@ public class Client {
                     int count = Integer.parseInt(firstLine);
                     count++;
                     Files.write(file.toPath(), String.valueOf(count).getBytes());
-                    System.out.println(Thread.currentThread().getName()+"写入数据：" + count);
+                    System.out.println(Thread.currentThread().getName() + "写入数据：" + count);
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {

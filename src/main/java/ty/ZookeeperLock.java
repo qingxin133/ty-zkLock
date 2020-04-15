@@ -3,6 +3,7 @@ package ty;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.lang3.StringUtils;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,6 +31,7 @@ public class ZookeeperLock {
 
     /**
      * 获取锁
+     *
      * @param lockId
      * @param timeout
      * @return
@@ -56,6 +58,7 @@ public class ZookeeperLock {
      * 如果自己是最小的有序临时节点，就激活自己，如果不是，就监听你前面的节点的删除事件
      * 得到监听事件，再次查看自己是否最小的节点，是就在同步代码块中，判断自己是否已经激活，是就唤醒自己的节点，取消对前一个节点的监听，
      * 不是就继续监听你最新的前一个节点
+     *
      * @param lockNode
      * @return
      */
@@ -70,7 +73,7 @@ public class ZookeeperLock {
                 .sorted()
                 .map(p -> lockNode.getLockId() + ZookeeperLock.SLASH + p)
                 .collect(Collectors.toList());
-        if (list != null && list.size()>0)
+        if (list != null && list.size() > 0)
             firstPath = list.get(0);
 
         //如果自己是第一个，把自己激活
@@ -97,8 +100,10 @@ public class ZookeeperLock {
                     //// 取消监听beforeNode节点
                     zkClient.unsubscribeDataChanges(beforeNode, this);
                 }
+
                 @Override
-                public void handleDataChange(String s, Object o) throws Exception {}
+                public void handleDataChange(String s, Object o) throws Exception {
+                }
             });
         }
         //添加上一个节点变更监听
@@ -108,24 +113,26 @@ public class ZookeeperLock {
 
     /**
      * 创建临时有序节点
+     *
      * @param lockId 锁的父路径
      * @return 返回组装好的实体类
      */
     private LockNode createLockNode(String lockId) {
-            if (!zkClient.exists(lockId)) {
-                zkClient.createPersistent(lockId);
-            }
-            String path = zkClient.createEphemeralSequential(lockId + ZookeeperLock.SLASH, ZookeeperLock.LOCK_DATA);
-            LockNode lockNode = new LockNode();
-            lockNode.setActive(false);
-            lockNode.setLockId(lockId);
-            lockNode.setPath(path);
-            return lockNode;
+        if (!zkClient.exists(lockId)) {
+            zkClient.createPersistent(lockId);
+        }
+        String path = zkClient.createEphemeralSequential(lockId + ZookeeperLock.SLASH, ZookeeperLock.LOCK_DATA);
+        LockNode lockNode = new LockNode();
+        lockNode.setActive(false);
+        lockNode.setLockId(lockId);
+        lockNode.setPath(path);
+        return lockNode;
     }
 
     /**
      * 释放锁
      * 如果获得锁就删除掉
+     *
      * @param lockNode
      */
     public void unLock(LockNode lockNode) {
